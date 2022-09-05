@@ -18,5 +18,6 @@ int main() {
     m61_print_statistics();
 }
 
+//!!TIME
 //! alloc count: active          0   total    5000000   fail          0
 //! alloc size:  active        ???   total 5000000000   fail          0

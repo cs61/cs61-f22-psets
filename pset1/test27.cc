@@ -51,6 +51,7 @@ int main() {
     }
 }
 
+//!!TIME
 //! alloc count: active          0   total ??>=50000??   fail        ???
 //! alloc size:  active          0   total ??>=1000000??   fail        ???
 //! peak memory used: ??{\d+kb}=peak_memory??

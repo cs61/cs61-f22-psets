@@ -527,7 +527,7 @@ if ($Exec) {
         printf STDERR "${test} ";
         $out = run_sh61("./${test}",
             "stdout" => "pipe", "stdin" => "/dev/null",
-            "time_limit" => $i == 14 || $i == 15 || $i == 19 ? 10 : 5,
+            "time_limit" => $i >= 27 && $i <= 30 ? 10 : 5,
             "size_limit" => 80000);
         my ($failed) = 0;
         if (exists($out->{killed})) {
@@ -553,6 +553,6 @@ if ($Exec) {
     } else {
         my($color) = ($ntestpassed == 0 ? $Red : ($ntestpassed == $ntest ? $Green : $Cyan));
         print STDERR "${color}$ntestpassed of $ntest ", ($ntest == 1 ? "test" : "tests"), " passed$Off\n";
-        exit(1);
+        exit($ntestpassed == $ntest ? 0 : 1);
     }
 }

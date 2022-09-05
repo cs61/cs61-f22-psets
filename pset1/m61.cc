@@ -1,6 +1,6 @@
-#define M61_DISABLE 1
 #include "m61.hh"
 #include <cstdlib>
+#include <cstddef>
 #include <cstring>
 #include <cstdio>
 #include <cinttypes>
