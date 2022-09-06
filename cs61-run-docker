@@ -81,7 +81,7 @@ fi
 ssharg=
 sshenvarg=
 if test -n "$SSH_AUTH_SOCK" -a "`uname`" = Darwin; then
-    ssharg=" -v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock"
+    ssharg=" --mount type=bind,src=/run/host-services/ssh-auth.sock,target=/run/host-services/ssh-auth.sock"
     sshenvarg=" -e SSH_AUTH_SOCK=/run/host-services/ssh-auth.sock"
 fi
 
