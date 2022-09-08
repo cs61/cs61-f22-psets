@@ -91,7 +91,7 @@ connected to the VM. (The `a47f05ea5085` part is a unique identifier for this
 running VM.) You can execute any Linux commands you want. To escape from the
 VM, type Control-D or run the `exit` command.
 
-The script assumes your Docker container is named `cs61:latest`.
+The script assumes your Docker container is named `cs61:latest` or `cs61:arm64`.
 
 
 ### Running CS 61 Docker by hand
@@ -126,7 +126,7 @@ cs61-psets
 cs61-user@a15e6c4c8dbe:~$ echo "Hello, world"
 Hello, world
 cs61-user@a15e6c4c8dbe:~$ cs61-docker-version
-13
+15
 cs61-user@a15e6c4c8dbe:~$ exit
 exit
 $ 
