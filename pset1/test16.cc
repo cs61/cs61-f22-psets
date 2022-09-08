@@ -18,4 +18,4 @@ int main() {
 }
 
 //! alloc count: active          5   total         10   fail          1
-//! alloc size:  active ??{55|40}??   total         55   fail ??{4294967295|18446744073709551615}??
+//! alloc size:  active        ???   total         55   fail ??{4294967295|18446744073709551615}??
