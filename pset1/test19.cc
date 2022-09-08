@@ -23,4 +23,4 @@ int main() {
 }
 
 //! alloc count: active          0   total          1   fail        100
-//! alloc size:  active ??{0|8192}??   total       8192   fail        ???
+//! alloc size:  active        ???   total       8192   fail        ???
