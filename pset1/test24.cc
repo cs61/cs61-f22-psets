@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cassert>
 #include <vector>
+#include <algorithm>
 // Check that small blocks of memory can be coalesced into larger pieces.
 
 int main() {

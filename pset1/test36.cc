@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cassert>
 #include <cstring>
+#include <algorithm>
 // Check that double free is detected after more frees and allocations.
 
 int main() {

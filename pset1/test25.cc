@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cassert>
 #include <vector>
+#include <algorithm>
 // Check that never-allocated memory can be coalesced with freed memory.
 
 int main() {

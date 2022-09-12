@@ -378,6 +378,14 @@ sub run_compare ($$$$$$) {
     }
 }
 
+sub push_expansion (\@$) {
+    my ($a, $x) = @_;
+    foreach my $t (split(/[\s,]+/, $x)) {
+        push @$a, $t if $t ne "";
+    }
+}
+
+
 my ($KeepGoing) = 0;
 
 while (@ARGV > 0) {
@@ -391,10 +399,10 @@ while (@ARGV > 0) {
     } elsif ($ARGV[0] eq "-k") {
         $KeepGoing = 1;
     } elsif ($ARGV[0] eq "-r" && @ARGV > 1) {
-        push @Restrict, $ARGV[1];
+        push_expansion @Restrict, $ARGV[1];
         shift @ARGV;
     } elsif ($ARGV[0] =~ /^-r(.+)$/) {
-        push @Restrict, $1;
+        push_expansion @Restrict, $1;
     } elsif ($ARGV[0] eq "-m") {
         $Make = 1;
     } elsif ($ARGV[0] eq "-e") {
@@ -423,21 +431,21 @@ foreach my $arg (@ARGV) {
         push @Makeargs, $arg;
     } else {
         $arg =~ s/test//g;
-        push @testargs, $arg;
+        push_expansion @testargs, $arg;
     }
 }
 
 sub test_class ($;@) {
     my($test) = shift @_;
     foreach my $x (@_) {
-        if ($test eq $x
-            || ($x =~ m{(?:\A|[,\s])(\d+)(?:[,\s]|\z)} && $test == $1)
-            || ($x =~ m{(?:\A|[,\s])(\d+)-(\d+)(?:[,\s]|\z)} && $test >= $1 && $test <= $2)
-            || $x =~ m{(?:\A|[,\s])$test(?:[,\s]|\z)}
-            || ($x =~ m{(?:\A|[,\s])phase1(?:[,\s]|\z)}i && $test >= 1 && $test <= 19)
-            || ($x =~ m{(?:\A|[,\s])phase2(?:[,\s]|\z)}i && $test >= 20 && $test <= 30)
-            || ($x =~ m{(?:\A|[,\s])phase3(?:[,\s]|\z)}i && $test >= 31 && $test <= 45)
-            || ($x =~ m{(?:\A|[,\s])phase4(?:[,\s]|\z)}i && $test >= 46 && $test <= 51)) {
+        if ($x eq $test
+            || ($x =~ m/\A(\d+)-(\d+)\z/ && $test >= $1 && $test <= 2)
+            || $x eq "san"
+            || $x eq "leak"
+            || ($x eq "phase1" && $test >= 1 && $test <= 19)
+            || ($x eq "phase2" && $test >= 20 && $test <= 30)
+            || ($x eq "phase3" && $test >= 31 && $test <= 45)
+            || ($x eq "phase4" && $test >= 46 && $test <= 51)) {
             return 1;
         }
     }
@@ -486,7 +494,7 @@ if ($Exec) {
                      read_expected($Exec . ".cc"),
                      $ofile, $Exec . ".cc", $Exec, $out));
 } else {
-    my(@tests) = (1..45);
+    my(@tests) = ();
     foreach my $fn (sort(glob("test[0-9][0-9].cc"), glob("test[0-9][0-9][0-9].cc"))) {
         my($n) = +substr($fn, 4, -3);
         push @tests, $n if !grep { $_ == $n } @tests;
