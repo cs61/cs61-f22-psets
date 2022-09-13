@@ -439,7 +439,8 @@ sub test_class ($;@) {
     my($test) = shift @_;
     foreach my $x (@_) {
         if ($x eq $test
-            || ($x =~ m/\A(\d+)-(\d+)\z/ && $test >= $1 && $test <= 2)
+            || ($x =~ m/\A\d+\z/ && $x == $test)
+            || ($x =~ m/\A(\d+)-(\d+)\z/ && $test >= $1 && $test <= $2)
             || $x eq "san"
             || $x eq "leak"
             || ($x eq "phase1" && $test >= 1 && $test <= 19)
@@ -560,7 +561,9 @@ if ($Exec) {
         exit(0);
     } else {
         my($color) = ($ntestpassed == 0 ? $Red : ($ntestpassed == $ntest ? $Green : $Cyan));
-        print STDERR "${color}$ntestpassed of $ntest ", ($ntest == 1 ? "test" : "tests"), " passed$Off\n";
+        if ($ntest != 1) {
+            print STDERR "${color}$ntestpassed of $ntest ", ($ntest == 1 ? "test" : "tests"), " passed$Off\n";
+        }
         exit($ntestpassed == $ntest ? 0 : 1);
     }
 }
