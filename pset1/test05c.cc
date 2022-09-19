@@ -1,5 +1,6 @@
 #include "m61.hh"
 #include <cstdio>
+#include <cstring>
 // Check total allocation size statistic and contents preservation.
 
 const char* const contents[10] = {
