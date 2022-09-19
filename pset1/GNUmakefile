@@ -1,4 +1,4 @@
-TESTS = $(patsubst %.cc,%,$(sort $(wildcard test[0-9][0-9].cc test[0-9][0-9][0-9]/.cc)))
+TESTS = $(patsubst %.cc,%,$(sort $(wildcard test[0-9][0-9].cc test[0-9][0-9][0-9a-z].cc test[0-9][0-9][0-9][a-z].cc)))
 all: $(TESTS)
 
 -include build/rules.mk

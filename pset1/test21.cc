@@ -6,10 +6,13 @@
 
 int main() {
     for (int i = 0; i != 10000; ++i) {
-        void* ptrs[5];
+        char* ptrs[5];
         for (int j = 0; j != 5; ++j) {
-            ptrs[j] = m61_malloc(1000);
+            ptrs[j] = (char*) m61_malloc(1000);
             assert(ptrs[j]);
+            for (int k = 0; k != j; ++k) {
+                assert(ptrs[k] + 1000 <= ptrs[j] || ptrs[j] + 1000 <= ptrs[k]);
+            }
         }
         for (int j = 5; j != 0; --j) {
             m61_free(ptrs[j - 1]);
