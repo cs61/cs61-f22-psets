@@ -387,6 +387,7 @@ sub push_expansion (\@$) {
 
 
 my ($KeepGoing) = 0;
+my ($Sanitizer) = 0;
 
 while (@ARGV > 0) {
     if ($ARGV[0] eq "-c" && @ARGV > 1 && $ARGV[1] =~ /^\d+$/) {
@@ -414,6 +415,7 @@ while (@ARGV > 0) {
         $Exec = $1;
     } elsif ($ARGV[0] =~ /=/) {
         push @Makeargs, $ARGV[0];
+        $Sanitizer = 1 if $ARGV[0] =~ /\ASAN=(?!\z|0\z)/;
     } elsif ($ARGV[0] =~ /\A-/) {
         print STDERR "Usage: ./check.pl [-c CONTEXT] [-l] [TESTS...]\n";
         print STDERR "       ./check.pl -x EXECFILE\n";
@@ -437,11 +439,16 @@ foreach my $arg (@ARGV) {
 
 sub test_class ($;@) {
     my($tn) = shift @_;
-    $tn =~ s/\Atest(\d*)/$1/;
-    my($tnum) = int($1);
+    my($tnum) = -1;
+    if ($tn =~ /\A(?:test|)(\d*)(.*)\z/) {
+        $tn = $1 . $2;
+        $tnum = int($1);
+    }
     foreach my $m (@_) {
         if ($m eq $tn
-            || ($m =~ m/\A\d+\*\z/ && int($m) == $tnum)
+            || ($m =~ m/\A(\d+)([*a-z])\z/
+                && int($1) == $tnum
+                && ($2 eq "*" || substr($tn, -1) eq $2))
             || ($m =~ m/\A(\d+)-(\d+)\z/ && $tnum >= $1 && $tnum <= $2)
             || $m eq "san"
             || $m eq "leak"
@@ -468,7 +475,7 @@ sub asan_options ($) {
 sub time_limit ($) {
     my($tn) = @_;
     if ($tn =~ /test(\d+)/ && $1 >= 27 && $1 <= 30) {
-        return 10;
+        return $Sanitizer ? 20 : 10;
     } else {
         return 5;
     }
