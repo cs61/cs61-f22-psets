@@ -10,7 +10,7 @@ void panic(const char* format, ...) {
     int len = vsnprintf(buf, sizeof(buf) - 1, format, val);
     va_end(val);
     if (len > 0 && buf[len - 1] != '\n') {
-        strcpy(buf + len, "\n");
+        strcpy(buf + len - (len == (int) sizeof(buf) - 1), "\n");
     }
     sys_panic(buf);
 }

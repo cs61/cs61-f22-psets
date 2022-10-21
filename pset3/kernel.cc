@@ -90,7 +90,7 @@ void kernel_start(const char* command) {
         process_setup(4, "allocator4");
     }
 
-    // Switch to the first process using run()
+    // switch to first process using run()
     run(&ptable[1]);
 }
 
