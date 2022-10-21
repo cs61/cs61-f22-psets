@@ -45,6 +45,7 @@ class memusage {
   private:
     unsigned* v_ = nullptr;
     mutable unsigned nerrors_ = 0;
+    bool separate_tables_ = false;
 
     // add `flags` to the page containing `pa`
     // This is safe to call even if `pa >= maxpa`.
@@ -82,14 +83,14 @@ void memusage::refresh() {
     mark(kptr2pa(v_), f_kernel);
 
     // mark pages accessible from each process's page table
-    bool any = false;
+    separate_tables_ = false;
     for (int pid = 1; pid < NPROC; ++pid) {
         unsigned pidflag = f_process(pid);
         proc* p = &ptable[pid];
         if (p->state != P_FREE
             && p->pagetable
             && p->pagetable != kernel_pagetable) {
-            any = true;
+            separate_tables_ = true;
 
             for (ptiter it(p); it.va() < VA_LOWEND; it.next()) {
                 mark(it.pa(), f_kernel | pidflag);
@@ -112,7 +113,7 @@ void memusage::refresh() {
     }
 
     // if no different process page tables, use physical address instead
-    if (!any) {
+    if (!separate_tables_) {
         for (vmiter it(kernel_pagetable, 0); it.va() < VA_LOWEND; ) {
             if (it.user()
                 && it.pa() < MEMSIZE_PHYSICAL
@@ -124,11 +125,6 @@ void memusage::refresh() {
                 it.next_range();
             }
         }
-    }
-
-    // mark my own memory
-    if (any) {
-        mark(kptr2pa(v_), f_kernel);
     }
 }
 
@@ -170,7 +166,7 @@ uint16_t memusage::symbol_at(uintptr_t pa) const {
         return 'R' | 0x0C00;
     } else if (is_reserved) {
         return 'R' | 0x0700;
-    } else if (is_kernel && pid != 0) {
+    } else if (is_kernel && pid != 0 && separate_tables_) {
         page_error(pa, "kernel data page mapped for user", marked_pid(v));
         return 'K' | 0xCD00;
     } else if (is_kernel) {
@@ -190,7 +186,7 @@ uint16_t memusage::symbol_at(uintptr_t pa) const {
             return 'K' | 0x0D00;
         } else if (vx == f_user) {
             return '.' | 0x0700;
-        } else if ((v & f_kernel) && (v & f_user)) {
+        } else if ((v & f_kernel) && (v & f_user) && separate_tables_) {
             page_error(pa, "kernel allocated page mapped for user",
                        marked_pid(v));
             return '*' | 0xF400;
