@@ -20,7 +20,7 @@ while ($sig_name[$SIGINT] ne "INT") {
 my($Red, $Redctx, $Green, $Greenctx, $Cyan, $Ylo, $Yloctx, $Off) = ("\x1b[01;31m", "\x1b[0;31m", "\x1b[01;32m", "\x1b[0;32m", "\x1b[01;36m", "\x1b[01;33m", "\x1b[0;33m", "\x1b[0m");
 $Red = $Redctx = $Green = $Greenctx = $Cyan = $Ylo = $Yloctx = $Off = "" if !-t STDERR || !-t STDOUT;
 my($ContextLines, $LeakCheck, $Make, $Test, $Exec) = (3, 0, 0, 0, 0);
-my(@Restrict, @Makeargs);
+my (@Makeargs);
 
 $SIG{"CHLD"} = sub {};
 $SIG{"TSTP"} = "DEFAULT";
@@ -143,7 +143,7 @@ sub run_sh61 ($;%) {
         if (waitpid($run61_pid, WNOHANG) > 0) {
             $answer->{status} = $?;
         } else {
-            $died = "timeout";
+            $died = sprintf("timeout after %.2fs", $time_limit);
         }
     };
 
@@ -191,6 +191,73 @@ sub run_sh61 ($;%) {
 
     return $answer;
 }
+
+
+# test matching
+my (@RESTRICT_TESTS, @ALLOW_TESTS);
+my (%KNOWN_TESTS) = (
+    "phase1" => "1-19", "phase2" => "20-30", "phase3" => "31-45", "phase4" => "46-51"
+);
+
+sub split_testid ($) {
+    my ($testid) = @_;
+    if ($_[0] =~ /\A([A-Za-z]*)(\d*)([A-Za-z]*)\z/) {
+        return (uc($1), +$2, lc($3));
+    } else {
+        return ($_[0], "", "");
+    }
+}
+
+sub split_testmatch ($) {
+    my @t;
+    while ($_[0] =~ m/(?:\A|[\s,])([A-Za-z]*|\*)-?(\*|\d*)(-\d*|[*.]|[A-Za-z][-A-Za-z]*|)(?=[\s,]|\z)/g) {
+        my $full = $1 . $2 . $3;
+        if (exists($KNOWN_TESTS{$full})) {
+            push(@t, &split_testmatch($KNOWN_TESTS{$full}));
+        } elsif (($2 ne "" || $3 eq "") && ($2 ne "*" || $3 ne "*")) {
+            push(@t, [uc($1), $2 eq "" || $2 eq "*" ? "" : +$2, lc($3)]);
+        }
+    }
+    @t;
+}
+
+sub match_testid ($$) {
+    my ($id, $match) = @_;
+    if (ref $match) {
+        my ($pfx, $num, $sfx) = split_testid($id);
+        my ($apfx, $anum, $asfx) = @$match;
+        # check prefix
+        return 0 if $apfx ne "" && $apfx ne "*" && $pfx ne $apfx;
+        # check test number
+        return 1 if $anum eq "";
+        my $anum2 = $anum;
+        if (substr($asfx, 0, 1) eq "-") {
+            $anum2 = $asfx eq "-" ? $num : +substr($asfx, 1);
+            $asfx = "";
+        }
+        return 0 if $num < $anum || $num > $anum2;
+        # check test suffix
+        return 1 if $asfx eq "" || $asfx eq "*";
+        return ($sfx eq "") if $asfx eq ".";
+        while ($asfx =~ /([a-z])(-\z|-[a-z]|(?!-))/g) {
+            return 1 if $sfx eq $1;
+            return 1 if $sfx gt $1 && $2 ne "" && ($2 eq "-" || $sfx le substr($2, 1));
+        }
+        return 0;
+    } else {
+        foreach my $m (split_testmatch($match)) {
+            return 1 if &match_testid($id, $m);
+        }
+        return 0;
+    }
+}
+
+sub testid_runnable ($) {
+    my ($testid) = @_;
+    return (!@RESTRICT_TESTS || !grep { match_testid($testid, $_) } @RESTRICT_TESTS)
+        && (!@ALLOW_TESTS || grep { match_testid($testid, $_) } @ALLOW_TESTS);
+}
+
 
 sub read_expected ($) {
     my($fname) = @_;
@@ -378,13 +445,6 @@ sub run_compare ($$$$$$) {
     }
 }
 
-sub push_expansion (\@$) {
-    my ($a, $x) = @_;
-    foreach my $t (split(/[\s,]+/, $x)) {
-        push @$a, $t if $t ne "";
-    }
-}
-
 
 my ($KeepGoing) = 0;
 my ($Sanitizer) = 0;
@@ -400,10 +460,14 @@ while (@ARGV > 0) {
     } elsif ($ARGV[0] eq "-k") {
         $KeepGoing = 1;
     } elsif ($ARGV[0] eq "-r" && @ARGV > 1) {
-        push_expansion @Restrict, $ARGV[1];
+        foreach my $t (split_testmatch($ARGV[1])) {
+            push @RESTRICT_TESTS, $t;
+        }
         shift @ARGV;
     } elsif ($ARGV[0] =~ /^-r(.+)$/) {
-        push_expansion @Restrict, $1;
+        foreach my $t (split_testmatch($1)) {
+            push @RESTRICT_TESTS, $t;
+        }
     } elsif ($ARGV[0] eq "-m") {
         $Make = 1;
     } elsif ($ARGV[0] eq "-e") {
@@ -427,13 +491,14 @@ while (@ARGV > 0) {
     shift @ARGV;
 }
 
-my (@testargs);
 foreach my $arg (@ARGV) {
     if ($arg =~ /=/) {
         push @Makeargs, $arg;
     } else {
         $arg =~ s/test//g;
-        push_expansion @testargs, $arg;
+        foreach my $t (split_testmatch($arg)) {
+            push @ALLOW_TESTS, $t;
+        }
     }
 }
 
@@ -481,13 +546,7 @@ sub time_limit ($) {
     }
 }
 
-sub test_runnable ($) {
-    my($tn) = @_;
-    foreach my $r (@Restrict) {
-        return 0 if !test_class($tn, $r);
-    }
-    return !@testargs || test_class($tn, @testargs);
-}
+
 
 sub run_make (@) {
     system("make", "--no-print-directory", @Makeargs, @_);
@@ -528,7 +587,7 @@ if ($Exec) {
 
     if ($Test) {
         foreach my $tn (@tests) {
-            print $tn, "\n" if test_runnable($tn);
+            print $tn, "\n" if testid_runnable($tn);
         }
         exit;
     }
@@ -536,7 +595,7 @@ if ($Exec) {
     if ($Make) {
         my(@makes);
         foreach my $tn (@tests) {
-            push @makes, $tn if test_runnable($tn);
+            push @makes, $tn if testid_runnable($tn);
         }
         my($out) = run_sh61(["make", "-s", "-n", @makes], "stdout" => "pipe");
         if ($out && $out->{status} == 0 && exists($out->{output})) {
@@ -551,7 +610,7 @@ if ($Exec) {
     }
     $ENV{"MALLOC_CHECK_"} = 0;
     foreach my $tn (@tests) {
-        next if !test_runnable($tn);
+        next if !testid_runnable($tn);
         ++$ntest;
         $ENV{"ASAN_OPTIONS"} = asan_options($tn);
         run_make($tn) if exists($need_make{$tn});
@@ -576,7 +635,7 @@ if ($Exec) {
     }
     my($ntestpassed) = $ntest - $ntestfailed;
     if ($ntest == 0) {
-        print STDERR "${Red}No tests match ", join(" ", @testargs), "$Off\n";
+        print STDERR "${Red}No tests match$Off\n";
         exit(2);
     } if ($ntest == @tests && $ntestpassed == $ntest) {
         print STDERR "${Green}All tests passed!$Off\n";
