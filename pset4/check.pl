@@ -196,9 +196,9 @@ sub run_sh61 ($;%) {
 
     eval {
         do {
-            my($delta) = 0.3;
+            my $delta = 0.3;
             if ($sigint_at) {
-                my($now) = Time::HiRes::time();
+                my $now = Time::HiRes::time();
                 $delta = min($delta, $sigint_at < $now + 0.02 ? 0.1 : $sigint_at - $now);
             }
             Time::HiRes::usleep($delta * 1e6) if $delta > 0;
@@ -208,17 +208,18 @@ sub run_sh61 ($;%) {
                 die "!";
             }
             if ($sigint_state == 1 && Time::HiRes::time() >= $sigint_at) {
-                my($pgrp) = POSIX::tcgetpgrp(fileno(TTY));
+                my $pgrp = POSIX::tcgetpgrp(fileno(TTY));
                 if ($pgrp != getpgrp()) {
                     kill(-$SIGINT, $pgrp);
                     $sigint_state = 2;
                 }
             }
             if (defined($size_limit) && $size_limit_file && @$size_limit_file) {
-                my($len) = 0;
+                my $len = 0;
                 $out = run_sh61_pipe($out, fileno(OR), $size_limit);
                 foreach my $fname (@$size_limit_file) {
-                    $len += ($fname eq "pipe" ? length($out) : -s $fname);
+                    my $flen = $fname eq "pipe" ? length($out) : -s $fname;
+                    $len += $flen if $flen;
                 }
                 if ($len > $size_limit) {
                     $died = "output file size $len, expected <= $size_limit";
@@ -1134,12 +1135,12 @@ enqueue("C20",
 enqueue("C21",
     "./cat61 -s 4096 -o files/out.txt /dev/urandom",
     "unmappable file, byte I/O, sequential",
-    "no_content_check" => 1, "insize" => 4096);
+    "perf" => 0, "no_content_check" => 1, "insize" => 4096);
 
 enqueue("C22",
     "./reverse61 -q -s 4096 -o files/out.txt /dev/urandom",
     "unmappable file, byte I/O, reverse order",
-    "no_content_check" => 1, "insize" => 4096);
+    "perf" => 0, "no_content_check" => 1, "insize" => 4096);
 
 
 # REGULAR FILES, SEQUENTIAL I/O
