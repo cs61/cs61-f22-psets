@@ -57,10 +57,13 @@ stdio-scattergather61
 stdio-stridecat61
 stdio-write61
 stdio-writeat61
+stdio-wreverse61
 stdio-wstridecat61
 strace.out*
 stridecat61
 syscall-blockcat61
+syscall-carefulblockcat61
+wreverse61
 write61
 writeat61
 wstridecat61
