@@ -7,6 +7,14 @@ ifeq ($(filter 0 1 2 3 s z g fast,$(O)),$(strip $(O)))
 override O := -O$(O)
 endif
 
+# skip x86 versions in ARM Docker
+X86 ?= 0
+ifneq ($(X86),1)
+ ifneq ($(findstring /usr/x86_64-linux-gnu/bin:,$(PATH)),)
+PATH := $(subst /usr/x86_64-linux-gnu/bin:,,$(PATH))
+ endif
+endif
+
 # sanitizer arguments
 ifndef SAN
 SAN := $(SANITIZE)
@@ -85,11 +93,11 @@ endif
 
 
 # when the C compiler or optimization flags change, rebuild all objects
-ifneq ($(strip $(DEP_CC)),$(strip $(CC) $(CPPFLAGS) $(CFLAGS) $(O)))
-DEP_CC := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CC:=$(CC) $(CPPFLAGS) $(CFLAGS) $(O)" >$(DEPSDIR)/_cc.d)
+ifneq ($(strip $(DEP_CC)),$(strip $(CC) $(CPPFLAGS) $(CFLAGS) $(O) X86=$(X86)))
+DEP_CC := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CC:=$(CC) $(CPPFLAGS) $(CFLAGS) $(O) X86=$(X86)" >$(DEPSDIR)/_cc.d)
 endif
-ifneq ($(strip $(DEP_CXX)),$(strip $(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) $(LDFLAGS)))
-DEP_CXX := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CXX:=$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) $(LDFLAGS)" >$(DEPSDIR)/_cxx.d)
+ifneq ($(strip $(DEP_CXX)),$(strip $(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) X86=$(X86) $(LDFLAGS)))
+DEP_CXX := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CXX:=$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) X86=$(X86) $(LDFLAGS)" >$(DEPSDIR)/_cxx.d)
 endif
 
 
