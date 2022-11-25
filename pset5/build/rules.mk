@@ -1,10 +1,30 @@
 # compiler flags
-CFLAGS := -std=gnu2x -W -Wall -Wshadow -g $(DEFS) $(CFLAGS)
-CXXFLAGS := -std=gnu++2a -W -Wall -Wshadow -g $(DEFS) $(CXXFLAGS)
+CFLAGS := -std=gnu2x -Wall -Wextra -Wshadow -g $(DEFS) $(CFLAGS)
+CXXFLAGS := -std=gnu++2a -Wall -Wextra -Wshadow -g $(DEFS) $(CXXFLAGS)
 
 O ?= -O3
-ifeq ($(filter 0 1 2 3 s z g fast,$(O)$(NOOVERRIDEO)),$(strip $(O)))
+ifeq ($(filter 0 1 2 3 s z g fast,$(O)),$(strip $(O)))
 override O := -O$(O)
+endif
+
+PTHREAD ?= 0
+ifeq ($(PTHREAD),1)
+CFLAGS += -pthread
+CXXFLAGS += -pthread
+WANT_TSAN ?= 1
+endif
+
+PIE ?= 1
+ifeq ($(PIE),0)
+LDFLAGS += -no-pie
+endif
+
+# skip x86 versions in ARM Docker
+X86 ?= 0
+ifneq ($(X86),1)
+ ifneq ($(findstring /usr/x86_64-linux-gnu/bin:,$(PATH)),)
+PATH := $(subst /usr/x86_64-linux-gnu/bin:,,$(PATH))
+ endif
 endif
 
 # compiler variant
@@ -41,7 +61,9 @@ endif
 ifeq ($(NEED_CXX_GCC),1)
 GXX_ISCLANG := $(shell if g++ --version | grep -e 'LLVM\|clang' >/dev/null; then echo 1; else echo 0; fi)
  ifeq ($(GXX_ISCLANG),1)
-  ifeq ($(shell if g++-11 --version 2>/dev/null | grep -e 'Free Software' >/dev/null; then echo 1; else echo 0; fi),1)
+  ifeq ($(shell if g++-12 --version 2>/dev/null | grep -e 'Free Software' >/dev/null; then echo 1; else echo 0; fi),1)
+CXX_GCC = g++-12
+  else ifeq ($(shell if g++-11 --version 2>/dev/null | grep -e 'Free Software' >/dev/null; then echo 1; else echo 0; fi),1)
 CXX_GCC = g++-11
   else ifeq ($(shell if g++-10 --version 2>/dev/null | grep -e 'Free Software' >/dev/null; then echo 1; else echo 0; fi),1)
 CXX_GCC = g++-10
@@ -55,12 +77,10 @@ endif
 
 # sanitizer arguments
 ifndef SAN
-SAN := $(SANITIZE)
+SAN := $(or $(SANITIZE),$(ASAN),$(UBSAN))
 endif
-ifeq ($(SAN),1)
- ifndef ASAN
-ASAN := $(if $(strip $(shell $(CC) -v 2>&1 | grep 'build=aarch.*target=x86')),,1)
- endif
+ifndef ASAN
+ASAN := $(if $(strip $(shell $(CC) -v 2>&1 | grep 'build=aarch.*target=x86')),0,1)
 endif
 ifndef TSAN
  ifeq ($(WANT_TSAN),1)
@@ -69,30 +89,31 @@ TSAN := $(SAN)
 endif
 
 check_for_sanitizer = $(if $(strip $(shell $(CC) -fsanitize=$(1) -x c -E /dev/null 2>&1 | grep sanitize=)),$(info ** WARNING: The `$(CC)` compiler does not support `-fsanitize=$(1)`.),1)
+SANFLAGS :=
 ifeq ($(TSAN),1)
  ifeq ($(call check_for_sanitizer,thread),1)
-CFLAGS += -fsanitize=thread
-CXXFLAGS += -fsanitize=thread
+SANFLAGS += -fsanitize=thread
  endif
 else
- ifeq ($(or $(ASAN),$(LSAN),$(LEAKSAN)),1)
+ ifneq ($(ASAN),0)
   ifeq ($(call check_for_sanitizer,address),1)
-CFLAGS += -fsanitize=address
-CXXFLAGS += -fsanitize=address
+SANFLAGS += -fsanitize=address
   endif
  endif
  ifeq ($(or $(LSAN),$(LEAKSAN)),1)
   ifeq ($(call check_for_sanitizer,leak),1)
-CFLAGS += -fsanitize=leak
-CXXFLAGS += -fsanitize=leak
+SANFLAGS += -fsanitize=leak
   endif
  endif
 endif
-ifeq ($(or $(UBSAN),$(SAN)),1)
+ifneq ($(UBSAN),0)
  ifeq ($(call check_for_sanitizer,undefined),1)
-CFLAGS += -fsanitize=undefined -fno-sanitize-recover=undefined
-CXXFLAGS += -fsanitize=undefined -fno-sanitize-recover=undefined
+SANFLAGS += -fsanitize=undefined -fno-sanitize-recover=undefined
  endif
+endif
+ifeq ($(or $(TSAN),$(LSAN),$(LEAKSAN),$(SAN)),1)
+CFLAGS += $(SANFLAGS)
+CXXFLAGS += $(SANFLAGS)
 endif
 
 # profiling
@@ -109,7 +130,7 @@ CXXFLAGS += -Wno-unused
 endif
 
 # these rules ensure dependencies are created
-DEPCFLAGS = -MD -MF $(DEPSDIR)/$*.d -MP
+DEPCFLAGS = -MD -MF $(DEPSDIR)/$(patsubst %.o,%,$(@F)).d -MP
 DEPSDIR := .deps
 BUILDSTAMP := $(DEPSDIR)/rebuildstamp
 DEPFILES := $(wildcard $(DEPSDIR)/*.d)
@@ -118,11 +139,11 @@ include $(DEPFILES)
 endif
 
 # when the C compiler or optimization flags change, rebuild all objects
-ifneq ($(strip $(DEP_CC)),$(strip $(CC) $(CPPFLAGS) $(CFLAGS) $(O)))
-DEP_CC := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CC:=$(CC) $(CPPFLAGS) $(CFLAGS) $(O)" >$(DEPSDIR)/_cc.d)
+ifneq ($(strip $(DEP_CC)),$(strip $(CC) $(CPPFLAGS) $(CFLAGS) $(O) X86=$(X86)))
+DEP_CC := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CC:=$(CC) $(CPPFLAGS) $(CFLAGS) $(O) X86=$(X86)" >$(DEPSDIR)/_cc.d)
 endif
-ifneq ($(strip $(DEP_CXX)),$(strip $(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) $(LDFLAGS)))
-DEP_CXX := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CXX:=$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) $(LDFLAGS)" >$(DEPSDIR)/_cxx.d)
+ifneq ($(strip $(DEP_CXX)),$(strip $(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) X86=$(X86) $(LDFLAGS)))
+DEP_CXX := $(shell mkdir -p $(DEPSDIR); echo >$(BUILDSTAMP); echo "DEP_CXX:=$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(O) X86=$(X86) $(LDFLAGS)" >$(DEPSDIR)/_cxx.d)
 endif
 
 
