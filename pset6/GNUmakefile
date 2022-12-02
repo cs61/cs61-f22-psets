@@ -28,7 +28,7 @@ check-%:
 
 clean: clean-main
 clean-main:
-	$(call run,rm -f $(TESTS) $(SLOWTESTS) $(STDIOTESTS) $(SYSCALLTESTS) socketpipe *.o core *.core,CLEAN)
+	$(call run,rm -f $(PROGRAMS) *.o core *.core,CLEAN)
 	$(call run,rm -rf $(DEPSDIR) files *.dSYM)
 
 distclean: clean
